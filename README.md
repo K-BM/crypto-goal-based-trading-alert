@@ -24,6 +24,13 @@ Risk Estimate: Low
 Here's how data moves through the system starting from the Binance API:
 1. User sends a goal:
 e.g., "My goal is +3% on BTC in next 2 days, low risk" via Telegram
+We'll ask the user step by step:
+Profit target (%):
+Asset (e.g., BTC):
+Time horizon (e.g., 2 days):
+Risk level (low, medium, high):
+
+Each response will be saved in a temporary user state (per chat ID).
 
 2. parser.py processes the input:
 Extracts target, asset, time window, risk level → returns a structured goal
