@@ -1,42 +1,89 @@
-# Telegram bot logic
-# app/bot.py
 # app/bot.py
 
 import os
+import asyncio
 from dotenv import load_dotenv
-import logging
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler,
+    MessageHandler, filters, ConversationHandler, ContextTypes
+)
 
-# Set up logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+# Load environment variables
 load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Telegram bot token from the BotFather
+# States
+TARGET, ASSET, TIME_HORIZON, RISK = range(4)
+user_states = {}
 
-# Start command handler
-def start(update: Update, context: CallbackContext) -> None:
-    user = update.effective_user
-    update.message.reply_text(f"Hi {user.first_name}, I am your goal-based trading assistant!")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    user_states[user_id] = {}
+    await update.message.reply_text("Welcome! What's your profit target in % (e.g., 3)?")
+    return TARGET
 
-# Help command handler
-def help_command(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("Use /setgoal to set your trading goal.")
+async def set_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    try:
+        # Replace commas with periods and convert to float
+        target_pct = float(update.message.text.replace(',', '.'))
+        user_states[user_id]['target_pct'] = target_pct
+        await update.message.reply_text("Which asset? (e.g., BTC)")
+        return ASSET
+    except ValueError:
+        # Handle invalid input
+        await update.message.reply_text("Invalid input. Please enter a valid number (e.g., 3 or 3.5).")
+        return TARGET
 
-# Function to start the bot
+async def set_asset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    user_states[user_id]['asset'] = update.message.text.upper()
+    await update.message.reply_text("What’s your time horizon? (e.g., 2 days, 4 hours)")
+    return TIME_HORIZON
+
+async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    user_states[user_id]['time_horizon'] = update.message.text
+    keyboard = [['low', 'medium', 'high']]
+    await update.message.reply_text(
+        "Select your risk level:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    )
+    return RISK
+
+async def set_risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    user_states[user_id]['risk'] = update.message.text.lower()
+    await update.message.reply_text(f"✅ Got it:\n\n{user_states[user_id]}")
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Cancelled.")
+    return ConversationHandler.END
+
 async def start_bot():
-    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
-    
-    dp = updater.dispatcher
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help_command))
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            TARGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_target)],
+            ASSET: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_asset)],
+            TIME_HORIZON: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_time)],
+            RISK: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_risk)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
 
-    # Start polling to get messages
-    updater.start_polling()
+    app.add_handler(conv_handler)
+    print("🤖 Telegram bot is starting...")
 
-    updater.idle()
+    # Properly initialize the application
+    await app.initialize()
+    await app.start()
+    print("🤖 Telegram bot is polling...")
+    await app.updater.start_polling()
+    await asyncio.Event().wait()  # Keep the bot running indefinitely
+    await app.stop()
+    await app.shutdown()

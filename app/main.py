@@ -1,17 +1,7 @@
-# FastAPI entry point: — it will handle a health check and prepare future endpoints if needed.
-
 # app/main.py
+import asyncio
+from bot import start_bot  # Import the start_bot function
 
-from fastapi import FastAPI
-from app.bot import start_bot
-
-app = FastAPI()
-
-@app.on_event("startup")
-async def startup_event():
-    print("🚀 Starting Goal-Based Trading Alert Bot...")
-    await start_bot()
-
-@app.get("/")
-async def root():
-    return {"message": "Goal-Based Trading Alert is running"}
+if __name__ == "__main__":
+    # Directly run the start_bot function using asyncio.run()
+    asyncio.run(start_bot())

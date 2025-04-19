@@ -1,0 +1,16 @@
+# Ignore virtual environments
+trading_venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment variables and credentials
+.env
+
+# VSCode or other editor settings
+.vscode/
