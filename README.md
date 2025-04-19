@@ -18,6 +18,36 @@ Time Horizon: 1h - 4h
 Risk Estimate: Low 
 📊 Attached: Chart with key levels
 
+---
+
+## 🔁 Data Flow from Binance API
+Here's how data moves through the system starting from the Binance API:
+1. User sends a goal:
+e.g., "My goal is +3% on BTC in next 2 days, low risk" via Telegram
+
+2. parser.py processes the input:
+Extracts target, asset, time window, risk level → returns a structured goal
+
+3. signal_engine.py:
+**Receives the parsed goal
+**Calls Binance API to:
+    - Get real-time price of BTC (or other asset)
+    - Pull historical OHLCV data for trend analysis
+**Evaluates the market and suggests:
+    - An entry price (e.g., current or upcoming support)
+    - An exit target (based on % profit)
+    - Risk profile (volatility, momentum, etc.)
+    - Time horizon (based on goal)
+
+4. chart.py:
+**Pulls the same historical price data from Binance
+**Plots an annotated chart:
+    - Marking entry, exit, trend lines, etc.
+**Returns image or buffer
+
+5. notifier.py:
+**Formats the goal + signal + chart
+**Sends the result via Telegram (or optionally SMS/email in future)
 
 ---
 
