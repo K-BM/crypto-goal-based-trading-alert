@@ -1,40 +1,63 @@
 from app.data.fetchers import BinanceDataFetcher
 from app.data.processors import DataProcessor
 from app.predictors.btc_predictor import BTCPredictor
-from app.alerts.notifiers import AlertNotifier
-from config import BINANCE_CONFIG, THRESHOLD_PCT
+from app.alerts.telegram_notifier import TelegramNotifier
+from config import TELEGRAM_CONFIG, BINANCE_CONFIG, THRESHOLD_PCT
 from datetime import datetime
+import pandas as pd
+
+print(f"⏰ Prediction ran at: {datetime.utcnow()} UTC")
 
 def main():
     # Initialize components
-    fetcher = BinanceDataFetcher(BINANCE_CONFIG['api_key'], BINANCE_CONFIG['api_secret'])
+    fetcher = BinanceDataFetcher()
     processor = DataProcessor()
-    predictor = BTCPredictor(THRESHOLD_PCT)
-    # notifier = AlertNotifier(EMAIL_RECEIVER)
-
     
+    # Create predictors for both directions
+    predictor_inc = BTCPredictor(THRESHOLD_PCT, direction='increase')
+    predictor_dec = BTCPredictor(THRESHOLD_PCT, direction='decrease')
+
     # Fetch and process data
     print(f"{datetime.now()} - Fetching data...")
-    hourly_data = fetcher.fetch_hourly_data("BTCUSDT", "1 Jan 2020")
-    hourly_with_indicators = processor.calculate_hourly_indicators(hourly_data)
-    
-    # Generate predictions
-    print(f"{datetime.now()} - Generating predictions...")
-    results_df = predictor.evaluate_multiple_thresholds(hourly_with_indicators)
+    daily_data = fetcher.fetch_daily_data(
+        symbol=BINANCE_CONFIG['symbol'],
+        start_str=BINANCE_CONFIG['start_date']
+    )
 
-    # Print summary of all thresholds
+    print(f"{datetime.now()} - Calculating technical indicators...")
+    daily_with_indicators = processor.calculate_daily_indicators(daily_data)
+
+    print(f"{datetime.now()} - Evaluating price increases...")
+    results_inc = predictor_inc.evaluate_multiple_thresholds(daily_with_indicators)
+
+    print(f"{datetime.now()} - Evaluating price decreases...")
+    results_dec = predictor_dec.evaluate_multiple_thresholds(daily_with_indicators)
+
+    # Combine results
+    combined_results = pd.concat([results_inc, results_dec])
+
+    # Display results
     print("\n" + "="*120)
-    print("SUMMARY OF ALL THRESHOLDS (PRICE INCREASE PREDICTION)".center(120))
+    print("COMBINED PREDICTION RESULTS".center(120))
     print("="*120)
-    print(results_df.round(2).to_string(index=False, justify='center'))
+    print(combined_results.round(2).to_string(index=False, justify='center'))
     print("="*120)
+
+    # Send results to Telegram
+    print(f"{datetime.now()} - Sending results to Telegram...")
+    telegram = TelegramNotifier()
     
-    # # Send alert
-    # print(f"{datetime.now()} - Sending alerts...")
-    # html_content = results_df.to_html()
-    # notifier.send_email_alert("BTC Prediction Update", html_content)
+    # Send separate messages for each direction
+    telegram.send_enhanced_prediction(
+        results_inc.round(2), 
+        title="BTC Price Increase Predictions"
+    )
+    telegram.send_enhanced_prediction(
+        results_dec.round(2),
+        title="BTC Price Decrease Predictions"
+    )
     
-    # print(f"{datetime.now()} - Process completed")
+    print(f"{datetime.now()} - Results sent to Telegram")
 
 if __name__ == "__main__":
     main()

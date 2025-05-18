@@ -10,7 +10,8 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Environment variables and credentials
-.env
+# .env
 
 # VSCode or other editor settings
 .vscode/
+# .env
